@@ -1,0 +1,20 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: cloudguard
+  namespace: cloudguard
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+spec:
+  ingressClassName: nginx
+  tls: [{ hosts: [cloudguard.example.com], secretName: cloudguard-tls }]
+  rules:
+    - host: cloudguard.example.com
+      http:
+        paths:
+          - path: /api
+            pathType: Prefix
+            backend: { service: { name: backend, port: { number: 8000 } } }
+          - path: /
+            pathType: Prefix
+            backend: { service: { name: frontend, port: { number: 3000 } } }

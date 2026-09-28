@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend
+  namespace: cloudguard
+spec:
+  selector: { app: backend }
+  ports: [{ port: 8000, targetPort: 8000 }]

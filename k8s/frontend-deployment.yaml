@@ -1,0 +1,21 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  namespace: cloudguard
+spec:
+  replicas: 2
+  selector: { matchLabels: { app: frontend } }
+  template:
+    metadata: { labels: { app: frontend } }
+    spec:
+      securityContext: { runAsNonRoot: true, seccompProfile: { type: RuntimeDefault } }
+      containers:
+        - name: frontend
+          image: CLOUDGUARD_FRONTEND_IMAGE
+          ports: [{ containerPort: 3000 }]
+          envFrom: [{ configMapRef: { name: cloudguard-config } }]
+          startupProbe: { httpGet: { path: /, port: 3000 }, failureThreshold: 30, periodSeconds: 5 }
+          readinessProbe: { httpGet: { path: /, port: 3000 }, initialDelaySeconds: 5, periodSeconds: 10, timeoutSeconds: 3, failureThreshold: 6 }
+          livenessProbe: { httpGet: { path: /, port: 3000 }, periodSeconds: 20, timeoutSeconds: 3, failureThreshold: 3 }
+          resources: { requests: { cpu: 100m, memory: 256Mi }, limits: { cpu: 500m, memory: 512Mi } }

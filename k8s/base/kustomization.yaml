@@ -1,0 +1,39 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: cloudguard
+resources:
+  - ../../k8s/namespace.yaml
+  - ../../k8s/configmap.yaml
+  - ../../k8s/backend-deployment.yaml
+  - ../../k8s/backend-service.yaml
+  - ../../k8s/frontend-deployment.yaml
+  - ../../k8s/frontend-service.yaml
+  - ../../k8s/hpa.yaml
+  - ../../k8s/ingress.yaml
+  - serviceaccount.yaml
+  - external-secret.yaml
+  - network-policy.yaml
+  - pod-disruption-budget.yaml
+commonLabels:
+  app.kubernetes.io/part-of: cloudguard
+  app.kubernetes.io/managed-by: kustomize
+images:
+  - name: CLOUDGUARD_BACKEND_IMAGE
+    newName: cloudguard-backend
+    newTag: latest
+  - name: CLOUDGUARD_FRONTEND_IMAGE
+    newName: cloudguard-frontend
+    newTag: latest
+patches:
+  - path: backend-security-patch.yaml
+    target:
+      kind: Deployment
+      name: backend
+  - path: frontend-security-patch.yaml
+    target:
+      kind: Deployment
+      name: frontend
+
+---
+# Deploy with: kubectl apply -k k8s/overlays/production
+# Secrets are sourced from AWS Secrets Manager through external-secrets.

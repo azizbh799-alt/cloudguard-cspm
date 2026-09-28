@@ -1,0 +1,37 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    env_file: .env
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-cloudguard}
+      POSTGRES_USER: ${POSTGRES_USER:-cloudguard}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+  backend:
+    build: ./backend
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-cloudguard}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-cloudguard}
+      CORS_ORIGINS: http://localhost:3000
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports: ["8000:8000"]
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8000
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports: ["3000:3000"]
+volumes:
+  postgres_data:

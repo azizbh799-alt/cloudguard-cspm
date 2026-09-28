@@ -1,0 +1,41 @@
+name: Deploy
+on:
+  push:
+    branches: [main]
+permissions:
+  id-token: write
+  contents: read
+env:
+  AWS_REGION: us-east-1
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+      - name: Log in to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+      - name: Build and push images
+        env:
+          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        run: |
+          docker build -t "$REGISTRY/cloudguard-backend:${GITHUB_SHA}" backend
+          docker build -t "$REGISTRY/cloudguard-frontend:${GITHUB_SHA}" frontend
+          docker push "$REGISTRY/cloudguard-backend:${GITHUB_SHA}"
+          docker push "$REGISTRY/cloudguard-frontend:${GITHUB_SHA}"
+      - uses: azure/setup-kubectl@v4
+      - run: aws eks update-kubeconfig --name cloudguard --region "$AWS_REGION"
+      - name: Render and apply production manifests
+        env:
+          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        run: |
+          sed -i "s#REPLACE_WITH_ECR_REGISTRY#${REGISTRY}#g; s#REPLACE_WITH_GIT_SHA#${GITHUB_SHA}#g" k8s/overlays/production/kustomization.yaml
+          sed -i "s#REPLACE_WITH_IRSA_ROLE_ARN#${{ secrets.CLOUDGUARD_IRSA_ROLE_ARN }}#g" k8s/base/serviceaccount.yaml
+          kubectl apply -k k8s/overlays/production
+          kubectl -n cloudguard rollout status deployment/backend --timeout=180s || { kubectl -n cloudguard rollout undo deployment/backend; exit 1; }
+          kubectl -n cloudguard rollout status deployment/frontend --timeout=180s || { kubectl -n cloudguard rollout undo deployment/frontend; exit 1; }
+          kubectl -n cloudguard get deployment/backend deployment/frontend -o wide

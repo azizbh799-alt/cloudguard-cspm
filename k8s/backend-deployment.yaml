@@ -1,0 +1,23 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+  namespace: cloudguard
+spec:
+  replicas: 2
+  selector: { matchLabels: { app: backend } }
+  template:
+    metadata: { labels: { app: backend } }
+    spec:
+      securityContext: { runAsNonRoot: true, seccompProfile: { type: RuntimeDefault } }
+      containers:
+        - name: backend
+          image: CLOUDGUARD_BACKEND_IMAGE
+          ports: [{ containerPort: 8000 }]
+          envFrom:
+            - configMapRef: { name: cloudguard-config }
+            - secretRef: { name: cloudguard-secrets }
+          startupProbe: { httpGet: { path: /healthz, port: 8000 }, failureThreshold: 30, periodSeconds: 5 }
+          readinessProbe: { httpGet: { path: /readyz, port: 8000 }, initialDelaySeconds: 5, periodSeconds: 10, timeoutSeconds: 3, failureThreshold: 6 }
+          livenessProbe: { httpGet: { path: /healthz, port: 8000 }, periodSeconds: 20, timeoutSeconds: 3, failureThreshold: 3 }
+          resources: { requests: { cpu: 100m, memory: 256Mi }, limits: { cpu: 500m, memory: 512Mi } }
